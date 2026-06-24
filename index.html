@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D&C Ticket Prioritization</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060419;--surface:#0d1040;--surface2:#0a0828;
+  --border:#1a1a5a;--border2:#0f0d28;
+  --text:#e8e8ff;--text2:#c8caf0;--text3:#9299e6;--text4:#7a75a6;--text5:#4a4580;
+  --foot:#9299e6;--hover:#111350;
+  --pink:#ff5ec4;--pink-dim:rgba(255,94,196,.12);--pink-border:rgba(255,94,196,.25);
+}
+body.light{
+  --bg:#f4f5fb;--surface:#ffffff;--surface2:#f0f1f8;
+  --border:#d8daf0;--border2:#e8eaf8;
+  --text:#1a1440;--text2:#2a2460;--text3:#5055a0;--text4:#7878b0;--text5:#a0a0c0;
+  --foot:#5055a0;--hover:#eceeff;
+  --pink:#d4008e;--pink-dim:rgba(212,0,142,.08);--pink-border:rgba(212,0,142,.2);
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text2);min-height:100vh;font-size:13px;transition:background .2s,color .2s}
+
+/* ── Config Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:520px;max-width:95vw}
+.modal h2{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
+.modal p{font-size:12px;color:var(--text3);margin-bottom:20px;line-height:1.6}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-size:12px;color:var(--text);font-family:'Inter',sans-serif;outline:none}
+.field input:focus{border-color:var(--pink)}
+.field .hint{font-size:10px;color:var(--text5);margin-top:4px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;border-radius:8px;padding:8px 18px;font-family:'Inter',sans-serif;transition:opacity .15s}
+.btn-primary{background:var(--pink);color:#060419}
+body.light .btn-primary{color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:transparent;color:var(--text3);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--text3)}
+
+/* ── Header ── */
+.hdr{background:var(--surface);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.bee{font-size:26px}
+.hdr-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.4px}
+.hdr-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.live-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,.12);color:#4ade80;font-size:10px;font-weight:500;padding:2px 7px;border-radius:999px;border:1px solid rgba(74,222,128,.25);margin-left:8px;vertical-align:middle}
+.live-dot{width:5px;height:5px;border-radius:50%;background:#4ade80}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.icon-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px;line-height:1;color:var(--text3);font-family:'Inter',sans-serif}
+.icon-btn:hover{border-color:var(--text3)}
+.refresh-btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;background:var(--pink);color:#060419;border:none;border-radius:8px;padding:9px 18px;font-family:'Inter',sans-serif;transition:opacity .15s;white-space:nowrap}
+body.light .refresh-btn{color:#fff}
+.refresh-btn:hover{opacity:.85}
+.refresh-btn:disabled{opacity:.5;cursor:not-allowed}
+.spin{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Error banner ── */
+.error-bar{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:10px 16px;font-size:11px;color:#f87171;margin:16px 24px 0;display:none}
+.error-bar.show{display:block}
+
+/* ── Body ── */
+.body{padding:20px 24px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:18px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.sc-lbl{font-size:9px;color:#c6c6c6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;font-weight:600}
+body.light .sc-lbl{color:var(--text3)}
+.sc-val{font-size:22px;font-weight:700;color:var(--text);line-height:1}
+.sc-sub{font-size:9px;color:var(--text5);margin-top:3px}
+.sc.pink .sc-val{color:var(--pink)}
+.sc.red .sc-val{color:#f87171}
+.sc.yellow .sc-val{color:#fbbf24}
+
+/* ── Filters ── */
+.filters{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.assignee-wrap{position:relative;flex-shrink:0}
+.assignee-select{appearance:none;-webkit-appearance:none;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 26px 5px 10px;font-size:11px;font-weight:500;color:var(--text);font-family:'Inter',sans-serif;cursor:pointer;outline:none}
+.assignee-select option{background:var(--surface);color:var(--text)}
+.assignee-chevron{position:absolute;right:7px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3)}
+.fb{background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:500;color:#797979;font-family:'Inter',sans-serif;transition:all .15s}
+.fb:hover{border-color:var(--text3);color:var(--text3)}
+.fb.active{background:var(--pink);color:#060419;border-color:var(--pink);font-weight:600}
+body.light .fb.active{color:#fff}
+.searchbox{flex:1;min-width:180px;max-width:260px;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:6px 10px}
+.searchbox input{border:none;background:transparent;font-size:11px;color:var(--text);width:100%;outline:none;font-family:'Inter',sans-serif}
+.searchbox input::placeholder{color:var(--text4);font-style:italic}
+
+/* ── Table ── */
+.tw{border:1px solid var(--border);border-radius:10px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:auto}
+th{background:var(--surface2);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--text)}
+th.no-sort{cursor:default}
+td{padding:10px 12px;border-bottom:1px solid var(--border2);vertical-align:top;color:var(--text);white-space:nowrap}
+td.wrap{white-space:normal;max-width:220px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--hover)}
+tr.is-new td{border-left:2px solid var(--pink)}
+.sort-ind{color:var(--pink)}
+.empty{text-align:center;padding:3rem;color:var(--text5)}
+
+/* loading skeleton */
+.skeleton-row td{background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;height:40px;border-radius:4px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── Pills ── */
+.pill{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.p-critical{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25)}
+.p-high{background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.25)}
+.p-medium{background:rgba(251,191,36,.12);color:#d97706;border:1px solid rgba(251,191,36,.25)}
+.p-low{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
+body.light .p-low{color:#059669}
+.pl-enterprise,.pl-custom{background:var(--pink-dim);color:var(--pink);border:1px solid var(--pink-border)}
+.pl-scale{background:rgba(146,153,230,.12);color:var(--text3);border:1px solid rgba(146,153,230,.25)}
+.pl-max{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
+body.light .pl-max{color:#059669}
+.pl-launch{background:rgba(251,191,36,.1);color:#d97706;border:1px solid rgba(251,191,36,.2)}
+.pl-trial{background:rgba(251,191,36,.08);color:#d97706;border:1px solid rgba(251,191,36,.25);font-style:italic}
+.pl-unknown{background:rgba(100,100,180,.1);color:var(--text4);border:1px solid rgba(100,100,180,.2)}
+.q-deliv{background:rgba(146,153,230,.12);color:var(--text3);border:1px solid rgba(146,153,230,.25)}
+.q-comp{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25)}
+.q-out{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
+body.light .q-out{color:#059669}
+.s-active{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
+body.light .s-active{color:#059669}
+.s-disabled{background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.35)}
+.s-blocked{background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.3)}
+.s-flagged{background:rgba(251,191,36,.1);color:#d97706;border:1px solid rgba(251,191,36,.2)}
+.it-locked{background:rgba(251,146,60,.1);color:#fb923c;border:1px solid rgba(251,146,60,.25)}
+.it-dmca,.it-aup,.it-abuse{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.25)}
+.it-deliv,.it-privacy{background:rgba(146,153,230,.1);color:var(--text3);border:1px solid rgba(146,153,230,.25)}
+.it-stripe,.it-flagged{background:rgba(251,191,36,.1);color:#d97706;border:1px solid rgba(251,191,36,.25)}
+.it-ad{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
+body.light .it-ad{color:#059669}
+.it-other{background:rgba(100,100,180,.1);color:var(--text4);border:1px solid rgba(100,100,180,.2)}
+.reply-us{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.25);font-weight:600}
+.reply-them{background:rgba(100,100,180,.1);color:var(--text4);border:1px solid rgba(100,100,180,.2)}
+.reply-none{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3);font-weight:600}
+
+/* ── Badges ── */
+.badge-expedite{display:inline-block;background:rgba(248,113,113,.18);color:#f87171;border:1px solid rgba(248,113,113,.4);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px;vertical-align:middle;text-transform:uppercase;letter-spacing:.05em}
+.badge-new{display:inline-block;background:var(--pink-dim);color:var(--pink);border:1px solid var(--pink-border);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-right:4px;vertical-align:middle;text-transform:uppercase}
+.badge-stale{display:inline-block;background:rgba(100,100,180,.1);color:var(--text4);border:1px solid rgba(100,100,180,.2);font-size:9px;padding:1px 5px;border-radius:4px;margin-left:3px;vertical-align:middle}
+
+/* ── Cell helpers ── */
+.w-urgent{color:#f87171;font-weight:600}
+.w-warn{color:#d97706;font-weight:500}
+.w-ok{color:var(--text3)}
+.req-name{color:var(--pink);text-decoration:none;font-weight:500;font-size:11px;display:block}
+.req-name:hover{text-decoration:underline;opacity:.8}
+.sub-text{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;display:block;margin-top:3px}
+.asgn{font-size:10px;color:var(--text4);margin-top:3px}
+.ticket-num{color:var(--pink);text-decoration:none;font-weight:600;font-size:11px}
+.ticket-num:hover{text-decoration:underline;opacity:.8}
+.ws-pills{display:flex;flex-direction:column;gap:4px}
+.ws-pill{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;text-decoration:none;white-space:nowrap;font-family:'Inter',sans-serif;transition:opacity .15s}
+.ws-pill:hover{opacity:.82}
+.ws-opscon{background:var(--pink);color:#060419}
+body.light .ws-opscon{color:#fff}
+.ws-pub{background:rgba(146,153,230,.2);color:var(--text3);border:1px solid rgba(146,153,230,.3)}
+.ws-none{font-size:10px;color:var(--text5)}
+.mrr-val{font-size:11px;font-weight:600;color:#4ade80;white-space:nowrap}
+body.light .mrr-val{color:#059669}
+.mrr-invoiced{font-size:10px;color:var(--text3)}
+.mrr-none{font-size:11px;color:var(--text5)}
+.mrr-sub{font-size:10px;color:var(--text4);margin-top:2px}
+.sig-cell{display:flex;flex-direction:column;gap:4px;min-width:160px;max-width:220px;white-space:normal}
+.sig-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;width:fit-content}
+.sig-blazer{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25)}
+.sig-disable{background:rgba(251,146,60,.12);color:#fb923c;border:1px solid rgba(251,146,60,.25)}
+.sig-ehawk{background:rgba(146,153,230,.12);color:var(--text3);border:1px solid rgba(146,153,230,.25)}
+.sig-text{font-size:10px;color:var(--text4);margin-top:2px;line-height:1.4;white-space:normal}
+.sig-none{font-size:10px;color:var(--text5)}
+.sig-score{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px;vertical-align:middle}
+.sig-score-high{background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3)}
+.sig-score-med{background:rgba(251,191,36,.1);color:#d97706;border:1px solid rgba(251,191,36,.25)}
+.sig-score-low{background:rgba(100,100,180,.1);color:var(--text4);border:1px solid rgba(100,100,180,.2)}
+.ni{border:1px solid var(--border);border-radius:5px;background:var(--surface2);color:var(--text);font-size:10px;padding:4px 7px;width:150px;font-family:'Inter',sans-serif;height:28px}
+.ni:focus{outline:none;border-color:var(--text3)}
+.ni::placeholder{color:var(--text4);font-style:italic}
+
+/* ── Legend / Footer ── */
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.leg-title{font-size:10px;font-weight:600;color:var(--text3);width:100%;margin-bottom:2px}
+.leg-item{font-size:10px;color:var(--text4)}
+.leg-item b{color:var(--text2)}
+.foot{margin-top:8px;font-size:10px;color:var(--foot);line-height:1.7}
+</style>
+</head>
+<body>
+
+<!-- ── Config Modal ── -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <h2>🐝 D&C Dashboard — API Setup</h2>
+    <p>Enter your credentials once — they're saved in localStorage and never leave your browser.</p>
+    <div class="field">
+      <label>Metabase URL</label>
+      <input type="text" id="cfg-mb-url" placeholder="https://beehiiv.metabaseapp.com">
+      <div class="hint">Your Metabase instance URL — no trailing slash</div>
+    </div>
+    <div class="field">
+      <label>Metabase API Key</label>
+      <input type="password" id="cfg-mb-token" placeholder="mb_…">
+      <div class="hint">Metabase Admin → Settings → Authentication → API Keys → Create API Key. Copy the key starting with <code>mb_</code></div>
+    </div>
+    <div class="field">
+      <label>Slack Bot Token</label>
+      <input type="password" id="cfg-slack-token" placeholder="xoxb-…">
+      <div class="hint">A Slack bot token with <code>channels:history</code> scope on the 5 bot channels</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" id="cfg-skip">Skip (no signals)</button>
+      <button class="btn btn-primary" id="cfg-save">Save & Load Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div class="hdr">
+  <div class="hdr-left">
+    <span class="bee">🐝</span>
+    <div>
+      <div class="hdr-title">D&C Ticket Prioritization <span class="live-badge"><span class="live-dot"></span>Live</span></div>
+      <div id="pts" class="hdr-sub">Deliverability, Compliance &amp; Outreach · loading…</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <button class="icon-btn" id="settings-btn" title="API Settings">⚙️</button>
+    <button class="icon-btn" id="theme-btn" title="Toggle theme">🌙</button>
+    <button class="refresh-btn" id="refresh-btn">
+      <svg id="refresh-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+      Refresh
+    </button>
+  </div>
+</div>
+
+<div id="error-bar" class="error-bar"></div>
+
+<div class="body">
+  <div class="stats">
+    <div class="sc"><div class="sc-lbl">Total open</div><div class="sc-val" id="s0">—</div></div>
+    <div class="sc pink"><div class="sc-lbl">Custom / Enterprise</div><div class="sc-val" id="s1">—</div><div class="sc-sub">top priority</div></div>
+    <div class="sc red"><div class="sc-lbl">Needs our reply</div><div class="sc-val" id="s-us">—</div><div class="sc-sub">waiting on us</div></div>
+    <div class="sc red"><div class="sc-lbl">Waiting 48h+</div><div class="sc-val" id="s2">—</div></div>
+    <div class="sc yellow"><div class="sc-lbl">Expedite</div><div class="sc-val" id="s-exp">—</div></div>
+    <div class="sc red"><div class="sc-lbl">Sending off</div><div class="sc-val" id="s3">—</div></div>
+    <div class="sc red"><div class="sc-lbl">High signal</div><div class="sc-val" id="s-sig">—</div><div class="sc-sub">bot flags</div></div>
+    <div class="sc"><div class="sc-lbl">New (&lt;2h)</div><div class="sc-val" id="s-new">—</div></div>
+  </div>
+
+  <div class="filters">
+    <div class="assignee-wrap">
+      <select class="assignee-select" id="assignee-sel" onchange="render()">
+        <option value="">Assignee: All</option>
+        <option value="__unassigned__">(Unassigned)</option>
+      </select>
+      <svg class="assignee-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <button class="fb active" onclick="filt('all',this)">All</button>
+    <button class="fb" onclick="filt('critical',this)">Critical</button>
+    <button class="fb" onclick="filt('high',this)">High</button>
+    <button class="fb" onclick="filt('medium',this)">Medium</button>
+    <button class="fb" onclick="filt('low',this)">Low</button>
+    <button class="fb" onclick="filt('needs-us',this)">Needs our reply</button>
+    <button class="fb" onclick="filt('expedite',this)">Expedite</button>
+    <button class="fb" onclick="filt('high-signal',this)">High signal</button>
+    <button class="fb" onclick="filt('open',this)">Needs action</button>
+    <button class="fb" onclick="filt('hold',this)">On hold</button>
+    <button class="fb" onclick="filt('done',this)">Done</button>
+    <div class="searchbox">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="si" type="text" placeholder="Search tickets, names, emails…" oninput="render()">
+    </div>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th onclick="srt('ticket_id')">Ticket <span id="si-ticket_id" class="sort-ind"></span></th>
+        <th onclick="srt('qrank')">Queue <span id="si-qrank" class="sort-ind"></span></th>
+        <th onclick="srt('rank')">Priority <span id="si-rank" class="sort-ind">↑</span></th>
+        <th class="no-sort">Issue Type</th>
+        <th class="no-sort">Requester</th>
+        <th class="no-sort">Account</th>
+        <th onclick="srt('planRank')">Plan <span id="si-planRank" class="sort-ind"></span></th>
+        <th onclick="srt('mrrSort')">MRR <span id="si-mrrSort" class="sort-ind"></span></th>
+        <th onclick="srt('wh')">Wait <span id="si-wh" class="sort-ind"></span></th>
+        <th onclick="srt('sendRank')">Sending <span id="si-sendRank" class="sort-ind"></span></th>
+        <th onclick="srt('sigScore')">Slack Signals <span id="si-sigScore" class="sort-ind"></span></th>
+        <th class="no-sort">Reply State</th>
+        <th class="no-sort">D&amp;C Notes</th>
+      </tr></thead>
+      <tbody id="tb"><tr class="skeleton-row"><td colspan="13">&nbsp;</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="legend">
+    <div class="leg-title">Priority scoring · Slack signal scoring</div>
+    <div class="leg-item"><b>Critical</b> = Custom/Enterprise · <b>High</b> = score 21–55 · <b>Medium</b> = 56–80 · <b>Low</b> = 81+</div>
+    <div class="leg-item">Score deductions: Custom/Enterprise −45 · Expedite −25 · 72h+ −30 · 48h+ −20 · 24h+ −10 · Sending off −18 · Needs our reply −12 · Signal ≥4 −15 · Signal 2–3 −8</div>
+    <div class="leg-item"><b>Signal High</b> ≥4pts · <b>Med</b> 2–3pts · <b>Low</b> 1pt · Blazer +1 · Disable-on-Send +2 · eHawk +2 · <b>Stale</b> = open 14+ days</div>
+  </div>
+  <div class="foot" id="foot">MRR via Swarm ClickHouse → Stripe · Slack signals from #bot-blazer-spam · #bot-disable-on-send · #bot-ehawk · Invoiced = custom contract · Solved tickets auto-removed on refresh</div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIG
+// ─────────────────────────────────────────────
+const SLACK_URL = 'https://slack.com/api';
+const SLACK_CHANNELS = ['C06KCLA38BY','C09GMURAJ1H','C071G4D1MC5','C04PFQ8NN7K'];
+const MB_DB_REDSHIFT = 67;
+const MB_DB_CH       = 100;
+
+const TICKET_SQL = `
+SELECT
+  t.ticket_id, t.status, t.subject, t.requester_email, t.requester_name,
+  t.ticket_tags, t.created_at, t.updated_at, t.group_name, t.assignee_name,
+  t.requester_ticket_last_update_at AS requester_last,
+  t.assignee_ticket_last_update_at  AS assignee_last,
+  MAX(CASE WHEN fh.field_name = '21992178083351' THEN fh.value END) AS workspace_id,
+  MAX(CASE WHEN fh.field_name = '14784153125911' THEN fh.value END) AS plan,
+  MAX(CASE WHEN fh.field_name = '22354823345687' THEN fh.value END) AS sending_disabled,
+  MAX(CASE WHEN fh.field_name = '21992040093463' THEN fh.value END) AS on_trial,
+  MAX(CASE WHEN fh.field_name = '21992168825495' THEN fh.value END) AS publication_id
+FROM zendesk_zendesk.zendesk__ticket_enriched t
+LEFT JOIN zendesk.ticket_field_history fh
+  ON fh.ticket_id = t.ticket_id
+  AND fh.field_name IN ('21992178083351','14784153125911','22354823345687','21992040093463','21992168825495')
+WHERE t.status IN ('new','open','pending')
+  AND t.group_name ILIKE '%Deliverability%'
+  AND (t._fivetran_deleted IS FALSE OR t._fivetran_deleted IS NULL)
+GROUP BY t.ticket_id,t.status,t.subject,t.requester_email,t.requester_name,
+  t.ticket_tags,t.created_at,t.updated_at,t.group_name,t.assignee_name,
+  t.requester_ticket_last_update_at,t.assignee_ticket_last_update_at
+ORDER BY t.created_at ASC LIMIT 200`;
+
+const MRR_INVOICED_PLAN_ID = 8;
+const PUB_BASE = 'https://beehiiv.metabaseapp.com/dashboard/959-publication-overview?email=&period=past30days~&publication_id=';
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let ALL = [];
+let notes  = JSON.parse(localStorage.getItem('dnc_standalone_notes')  || '{}');
+let states = JSON.parse(localStorage.getItem('dnc_standalone_states') || '{}');
+let mrrMap = {};
+let sigMap = {};
+let cf = 'all', sc = 'rank', sd = 'asc';
+let isLoading = false;
+
+function getMBToken()    { return localStorage.getItem('dnc_mb_token')    || ''; }
+function getMBUrl()      { return (localStorage.getItem('dnc_mb_url') || 'https://beehiiv.metabaseapp.com').replace(/\/+$/, ''); }
+function getSlackToken() { return localStorage.getItem('dnc_slack_token') || ''; }
+
+// ─────────────────────────────────────────────
+//  THEME
+// ─────────────────────────────────────────────
+let isLight = JSON.parse(localStorage.getItem('dnc_light') || 'false');
+function applyTheme() {
+  document.body.classList.toggle('light', isLight);
+  document.getElementById('theme-btn').textContent = isLight ? '☀️' : '🌙';
+}
+document.getElementById('theme-btn').onclick = () => {
+  isLight = !isLight;
+  localStorage.setItem('dnc_light', JSON.stringify(isLight));
+  applyTheme();
+};
+applyTheme();
+
+// ─────────────────────────────────────────────
+//  CONFIG MODAL
+// ─────────────────────────────────────────────
+function showModal() {
+  document.getElementById('cfg-mb-url').value      = getMBUrl();
+  document.getElementById('cfg-mb-token').value    = getMBToken();
+  document.getElementById('cfg-slack-token').value = getSlackToken();
+  document.getElementById('config-modal').classList.remove('hidden');
+}
+function hideModal() {
+  document.getElementById('config-modal').classList.add('hidden');
+}
+document.getElementById('settings-btn').onclick = showModal;
+document.getElementById('cfg-save').onclick = () => {
+  localStorage.setItem('dnc_mb_url',      document.getElementById('cfg-mb-url').value.trim().replace(/\/+$/, ''));
+  localStorage.setItem('dnc_mb_token',    document.getElementById('cfg-mb-token').value.trim());
+  localStorage.setItem('dnc_slack_token', document.getElementById('cfg-slack-token').value.trim());
+  hideModal();
+  loadAll();
+};
+document.getElementById('cfg-skip').onclick = () => { hideModal(); loadAll(); };
+
+// Show modal on first load if no token saved
+if (!getMBToken()) { showModal(); } else { loadAll(); }
+
+// ─────────────────────────────────────────────
+//  METABASE API
+// ─────────────────────────────────────────────
+async function mbQuery(dbId, sql) {
+  const token = getMBToken();
+  const url   = getMBUrl();
+  if (!token) throw new Error('No Metabase API key configured. Click ⚙️ to set up.');
+  const res = await fetch(`${url}/api/dataset`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': token
+    },
+    body: JSON.stringify({ database: dbId, type: 'native', native: { query: sql } })
+  });
+  if (!res.ok) throw new Error(`Metabase HTTP ${res.status} — check your API key and URL`);
+  const data = await res.json();
+  if (data.error) throw new Error(`Metabase: ${data.error}`);
+  const cols = data.data.cols.map(c => c.name);
+  return data.data.rows.map(row => Object.fromEntries(cols.map((c, i) => [c, row[i]])));
+}
+
+// ─────────────────────────────────────────────
+//  SLACK API
+// ─────────────────────────────────────────────
+async function slackHistory(channelId) {
+  const token = getSlackToken();
+  if (!token) return [];
+  const res = await fetch(`${SLACK_URL}/conversations.history?channel=${channelId}&limit=50`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const data = await res.json();
+  return data.ok ? (data.messages || []) : [];
+}
+
+function parseSlackMessages(messages, channelId) {
+  const signals = {};
+
+  for (const msg of messages) {
+    const text = msg.text || '';
+    // Also check block kit attachments/fallback text
+    const fullText = [
+      text,
+      ...(msg.attachments || []).map(a => a.text || a.fallback || ''),
+      ...(msg.blocks || []).flatMap(b => [
+        b.text?.text || '',
+        ...(b.fields || []).map(f => f.text || '')
+      ])
+    ].join('\n');
+
+    let bot, cls, score, orgId, reason;
+
+    if (channelId === 'C071G4D1MC5') {
+      // #bot-blazer-spam: contains "*Organization ID:* <uuid>"
+      const orgMatch = fullText.match(/Organization ID\*?:?\s*\*?\s*([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+      if (!orgMatch) continue;
+      orgId = orgMatch[1];
+      // Extract reason: "flag 'X'" or "Reason: X"
+      const flagMatch  = fullText.match(/flag\s+['']([^''']+)[''']/i);
+      const reasonMatch= fullText.match(/[Rr]eason:\s*([^\n*]+)/);
+      reason = (flagMatch?.[1] || reasonMatch?.[1] || 'Blazer flag').replace(/<[^>]+>/g,'').trim().slice(0, 80);
+      bot = '🔥 Blazer'; cls = 'sig-blazer'; score = 1;
+
+    } else if (channelId === 'C09GMURAJ1H') {
+      // #bot-disable-on-send: contains organization ID somewhere
+      const orgMatch = fullText.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+      if (!orgMatch) continue;
+      orgId = orgMatch[1];
+      const reasonMatch = fullText.match(/[Rr]eason:\s*([^\n*]+)/);
+      reason = (reasonMatch?.[1] || 'Disable-on-send triggered').replace(/<[^>]+>/g,'').trim().slice(0, 80);
+      bot = '🚫 Disable-on-Send'; cls = 'sig-disable'; score = 2;
+
+    } else if (channelId === 'C06KCLA38BY') {
+      // #bot-ehawk: "Email: `user@email.com`" — key on email, not org ID
+      const emailMatch = fullText.match(/Email:\s*[`<]?([^\s`>|]+@[^\s`>|]+)[`>]?/i);
+      if (!emailMatch) continue;
+      // Store by email key instead of orgId — we'll merge by email later
+      const email = emailMatch[1].toLowerCase();
+      const riskMatch = fullText.match(/(High Risk|Medium Risk|Low Risk)/i);
+      reason = (riskMatch?.[1] || 'eHawk flag') + ' — signup risk score';
+      bot = '🦅 eHawk'; cls = 'sig-ehawk'; score = 2;
+      if (!signals[email]) signals[email] = [];
+      signals[email].push({ bot, cls, score, text: reason });
+      continue; // skip orgId path below
+
+    } else if (channelId === 'C04PFQ8NN7K') {
+      // #bot-flagged-sends: contains "Owner Email: *email*" and "Publication ID: *uuid*"
+      const pubMatch   = fullText.match(/Publication ID:\s*\*?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\*?/i);
+      const emailMatch = fullText.match(/Owner Email:\s*\*?([^\s*\n]+)\*?/i);
+      if (!pubMatch && !emailMatch) continue;
+      // Key by owner email for flagged sends
+      const key = emailMatch?.[1]?.toLowerCase() || pubMatch?.[1];
+      const subjectMatch = fullText.match(/Subject:\s*([^\n]+)/i);
+      reason = 'Flagged send — ' + (subjectMatch?.[1]?.replace(/<[^>]+>/g,'').trim().slice(0,60) || 'low engagement');
+      bot = '🚩 Flagged Send'; cls = 'sig-flagged'; score = 4;
+      if (!signals[key]) signals[key] = [];
+      signals[key].push({ bot, cls, score, text: reason });
+      continue;
+
+    } else { continue; }
+
+    if (!signals[orgId]) signals[orgId] = [];
+    signals[orgId].push({ bot, cls, score, text: reason });
+  }
+  return signals;
+}
+
+// ─────────────────────────────────────────────
+//  MRR LOOKUP
+// ─────────────────────────────────────────────
+async function loadMRR(workspaceIds) {
+  const ids = workspaceIds.filter(Boolean);
+  if (!ids.length) return;
+  // Step 1: ClickHouse → stripe_customer_id
+  const idList = ids.map(id => `'${id}'`).join(',');
+  let orgs;
+  try {
+    orgs = await mbQuery(MB_DB_CH,
+      `SELECT id AS workspace_id, stripe_customer_id, plan_id FROM swarm_clickpipes.organizations FINAL WHERE id IN (${idList})`
+    );
+  } catch(e) { console.warn('ClickHouse MRR lookup failed:', e); return; }
+
+  const invoicedIds = new Set(orgs.filter(o => o.plan_id === 8).map(o => o.workspace_id));
+  const stripeMap = {};
+  for (const o of orgs) {
+    if (o.plan_id !== 8 && o.stripe_customer_id) stripeMap[o.stripe_customer_id] = o.workspace_id;
+  }
+  // Mark invoiced
+  for (const wsId of invoicedIds) mrrMap[wsId] = { invoiced: true };
+
+  const custIds = Object.keys(stripeMap);
+  if (!custIds.length) return;
+  // Step 2: Redshift MRR model
+  const custList = custIds.map(id => `'${id}'`).join(',');
+  let mrrRows;
+  try {
+    mrrRows = await mbQuery(MB_DB_REDSHIFT,
+      `SELECT customer_id, ROUND(CAST(SUM(mrr) AS NUMERIC(18,2)),2) AS mrr, ROUND(CAST(SUM(total_mrr) AS NUMERIC(18,2)),2) AS total_mrr
+       FROM metabase_cache_67484_67.model_531_internal_p
+       WHERE month = DATE_TRUNC('month', GETDATE()) AND customer_id IN (${custList})
+       GROUP BY customer_id`
+    );
+  } catch(e) { console.warn('Redshift MRR lookup failed:', e); return; }
+
+  for (const row of mrrRows) {
+    const wsId = stripeMap[row.customer_id];
+    if (wsId) mrrMap[wsId] = { mrr: row.mrr, total: row.total_mrr };
+  }
+}
+
+// ─────────────────────────────────────────────
+//  SLACK SIGNALS
+// ─────────────────────────────────────────────
+async function loadSignals(tickets) {
+  if (!getSlackToken()) return;
+  const wsSet    = new Set(tickets.map(t => t.workspace_id).filter(Boolean));
+  const emailSet = new Set(tickets.map(t => (t.requester_email||'').toLowerCase()).filter(Boolean));
+
+  const results = await Promise.allSettled(
+    SLACK_CHANNELS.map(ch => slackHistory(ch).then(msgs => ({ ch, msgs })))
+  );
+
+  // Merge all parsed signals into a combined map keyed by orgId OR email
+  const rawSigMap = {};
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    const { ch, msgs } = r.value;
+    const parsed = parseSlackMessages(msgs, ch);
+    for (const [key, sigs] of Object.entries(parsed)) {
+      if (!rawSigMap[key]) rawSigMap[key] = [];
+      rawSigMap[key].push(...sigs);
+    }
+  }
+
+  // Map signals onto tickets by workspace_id first, then requester_email
+  sigMap = {};
+  for (const t of tickets) {
+    const wsId = t.workspace_id;
+    const email = (t.requester_email || '').toLowerCase();
+    const combined = [
+      ...(wsId  ? (rawSigMap[wsId]  || []) : []),
+      ...(email ? (rawSigMap[email] || []) : []),
+    ];
+    if (combined.length && wsId) sigMap[wsId] = combined;
+    else if (combined.length)    sigMap[email] = combined;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  MAIN LOAD
+// ─────────────────────────────────────────────
+async function loadAll() {
+  if (isLoading) return;
+  isLoading = true;
+  setRefreshing(true);
+  showError('');
+
+  try {
+    // 1. Tickets
+    const tickets = await mbQuery(MB_DB_REDSHIFT, TICKET_SQL);
+    const wsIds = [...new Set(tickets.map(t => t.workspace_id).filter(Boolean))];
+
+    // 2. MRR + Signals in parallel
+    await Promise.allSettled([loadMRR(wsIds), loadSignals(tickets)]);
+
+    // 3. Enrich + render
+    ALL = tickets.map(enrich);
+    buildAssigneeList();
+    updStats();
+    render();
+
+    const ts = new Date().toLocaleString();
+    document.getElementById('pts').textContent = `Deliverability, Compliance & Outreach · ${ts} · ${ALL.length} tickets`;
+    document.getElementById('foot').textContent = `Last refreshed: ${ts} · MRR via Swarm → Stripe · Slack signals live · Solved tickets excluded`;
+
+  } catch (err) {
+    showError(`Error loading data: ${err.message}. Check your API credentials (⚙️) or Metabase access.`);
+    console.error(err);
+  }
+
+  isLoading = false;
+  setRefreshing(false);
+}
+
+document.getElementById('refresh-btn').onclick = loadAll;
+
+function setRefreshing(on) {
+  const btn = document.getElementById('refresh-btn');
+  const icon = document.getElementById('refresh-icon');
+  btn.disabled = on;
+  icon.classList.toggle('spin', on);
+}
+function showError(msg) {
+  const el = document.getElementById('error-bar');
+  el.textContent = msg;
+  el.classList.toggle('show', !!msg);
+}
+
+// ─────────────────────────────────────────────
+//  ENRICHMENT
+// ─────────────────────────────────────────────
+const PLAN_ORD   = {enterprise:0,custom:0,scale:1,max:2,launch:3,grow:4,free:5,unknown:6};
+const PLAN_RANK  = {enterprise:1,custom:1,scale:2,max:3,launch:4,grow:5,free:6,unknown:7};
+const Q_RANK     = {Compliance:1,Outreach:2,Deliverability:3};
+const RANK_MAP   = {critical:1,high:2,medium:3,low:4};
+const nowMs = () => Date.now();
+const wh = d => Math.round((nowMs() - new Date(d)) / 3600000);
+const fmtW = h => h < 24 ? h + 'h' : Math.floor(h/24) + 'd' + (h%24 ? ' ' + (h%24) + 'h' : '');
+
+function issueType(tags) {
+  const t = (tags||'').toLowerCase();
+  if (t.includes('compliance-dmca'))       return {label:'DMCA',cls:'it-dmca'};
+  if (t.includes('compliance-aup'))        return {label:'AUP Violation',cls:'it-aup'};
+  if (t.includes('compliance-stripe_verification')) return {label:'Stripe Verify',cls:'it-stripe'};
+  if (t.includes('compliance-ad_network') || t.includes('boosts_fraud')) return {label:'Ad Network',cls:'it-ad'};
+  if (t.includes('compliance-data_privacy') || t.includes('gdpr')) return {label:'Data Privacy',cls:'it-privacy'};
+  if (t.includes('compliance-review') || t.includes('compliance-block_false_positive')) return {label:'Review',cls:'it-other'};
+  if (t.includes('dnc-abuse') || t.includes('sending_compliance_outreach')) return {label:'Abuse/Outreach',cls:'it-abuse'};
+  if (t.includes('sending_blocked') || t.includes('can_t_access') || t.includes('blocked_user')) return {label:'Acct Locked',cls:'it-locked'};
+  if (t.includes('dnc-deliv') || t.includes('deliverability')) return {label:'Deliverability',cls:'it-deliv'};
+  if (t.includes('sending_flagged')) return {label:'Flagged',cls:'it-flagged'};
+  return {label:'Other',cls:'it-other'};
+}
+function replyState(t) {
+  if (t.status === 'pending') return {label:'Waiting on them',cls:'reply-them',sort:3};
+  if (!t.requester_last && !t.assignee_last) return {label:'No reply yet',cls:'reply-none',sort:0};
+  const rl = t.requester_last ? new Date(t.requester_last).getTime() : 0;
+  const al = t.assignee_last  ? new Date(t.assignee_last).getTime()  : 0;
+  return rl > al ? {label:'Needs our reply',cls:'reply-us',sort:0} : {label:'Waiting on them',cls:'reply-them',sort:3};
+}
+function sendState(tags, disabled) {
+  const t = (tags||'').toLowerCase();
+  if (disabled === '1' || disabled === 'true') return {label:'Disabled',cls:'s-disabled',rank:2};
+  if (t.includes('sending_blocked'))           return {label:'Blocked', cls:'s-blocked', rank:3};
+  if (t.includes('sending_flagged'))           return {label:'Flagged', cls:'s-flagged', rank:4};
+  return {label:'Active',cls:'s-active',rank:5};
+}
+function queue(tags) {
+  const t = (tags||'').toLowerCase();
+  if (t.includes('sending_compliance_outreach')) return 'Outreach';
+  if (t.includes('compliance')||t.includes('dmca')||t.includes('aup')||t.includes('data_privacy')||
+      t.includes('trademark')||t.includes('stripe_verification')||t.includes('ad_network')||
+      t.includes('boosts_fraud')||t.includes('review')) return 'Compliance';
+  return 'Deliverability';
+}
+const isCust = (tags, plan) => {
+  const t = (tags||'').toLowerCase(), p = (plan||'').toLowerCase();
+  return t.includes('custom')||t.includes('enterprise')||p==='enterprise'||p==='custom';
+};
+const isExpedite = tags => {
+  const t = (tags||'').toLowerCase();
+  return t.includes('expedite_ticket') || t.includes('dnc_expedited');
+};
+function sigScore(sigs) { return (sigs||[]).reduce((a,x) => a + x.score, 0); }
+function sigLevel(sc) { return sc >= 4 ? 'high' : sc >= 2 ? 'med' : sc >= 1 ? 'low' : 'none'; }
+function planLabel(p, cust, trial) {
+  if (trial === '1') return {label:'Trial',cls:'pl-trial'};
+  if (cust && (p||'').toLowerCase() !== 'enterprise') return {label:'Custom',cls:'pl-custom'};
+  if ((p||'').toLowerCase() === 'enterprise') return {label:'Enterprise',cls:'pl-enterprise'};
+  if (!p) return {label:'Unknown',cls:'pl-unknown'};
+  return {label: p.charAt(0).toUpperCase()+p.slice(1), cls:'pl-'+(p.toLowerCase())};
+}
+
+function enrich(t) {
+  const md  = t.workspace_id ? (mrrMap[t.workspace_id] || null) : null;
+  const mrr = md ? md.mrr : null;
+  const mrrInvoiced = md ? !!md.invoiced : false;
+  const mrrSort = mrr !== null ? mrr : (mrrInvoiced ? 99999 : -1);
+  const whr  = wh(t.created_at);
+  const cust = isCust(t.ticket_tags, t.plan);
+  const expedite = isExpedite(t.ticket_tags);
+  const rs = replyState(t);
+  const ss = sendState(t.ticket_tags, t.sending_disabled);
+  const it = issueType(t.ticket_tags);
+  const q  = queue(t.ticket_tags);
+  const pl = planLabel(t.plan, cust, t.on_trial);
+  const planRank = PLAN_RANK[(t.plan||'unknown').toLowerCase()] ?? 7;
+  const sigs = (t.workspace_id ? (sigMap[t.workspace_id] || []) : [])
+    .concat(sigMap[(t.requester_email||'').toLowerCase()] || [])
+    .filter((s, i, arr) => arr.indexOf(s) === i); // dedupe
+  const sigSc = sigScore(sigs);
+
+  const base = {
+    ...t, wh: whr, cust, expedite, rs, ss, it, q,
+    isNew: whr < 2, isStale: whr > 14 * 24,
+    mrr, mrrInvoiced, mrrSort, mrrTotal: md ? md.total : null,
+    pl, planRank, qrank: Q_RANK[q] || 3, sendRank: ss.rank,
+    sigs, sigScore: sigSc, sigLevel: sigLevel(sigSc)
+  };
+
+  let ps = 100 + ((PLAN_ORD[(t.plan||'unknown').toLowerCase()] ?? 6) * 18);
+  if (whr >= 72) ps -= 30; else if (whr >= 48) ps -= 20; else if (whr >= 24) ps -= 10;
+  if (ss.rank <= 3)  ps -= 18;
+  if (cust)          ps -= 45;
+  if (expedite)      ps -= 25;
+  if (rs.sort === 0) ps -= 12;
+  if (sigSc >= 4)    ps -= 15; else if (sigSc >= 2) ps -= 8;
+
+  const prl = (cust || ps <= 20) ? 'critical' : ps <= 55 ? 'high' : ps <= 80 ? 'medium' : 'low';
+  return {...base, ps, prl, rank: RANK_MAP[prl]};
+}
+
+// ─────────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────────
+const getState = id => states[id] || 'open';
+
+function buildAssigneeList() {
+  const sel = document.getElementById('assignee-sel');
+  const names = [...new Set(ALL.map(t => t.assignee_name||'').filter(Boolean))].sort();
+  while (sel.options.length > 2) sel.remove(2);
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+}
+
+function updStats() {
+  const active = ALL.filter(t => getState(t.ticket_id) === 'open');
+  document.getElementById('s0').textContent    = active.length;
+  document.getElementById('s1').textContent    = active.filter(t => t.cust).length;
+  document.getElementById('s-us').textContent  = active.filter(t => t.rs.sort === 0).length;
+  document.getElementById('s2').textContent    = active.filter(t => t.wh >= 48).length;
+  document.getElementById('s-exp').textContent = active.filter(t => t.expedite).length;
+  document.getElementById('s3').textContent    = active.filter(t => t.ss.rank <= 3).length;
+  document.getElementById('s-sig').textContent = active.filter(t => t.sigLevel === 'high').length;
+  document.getElementById('s-new').textContent = active.filter(t => t.isNew).length;
+}
+
+function filt(f, btn) {
+  cf = f;
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+function srt(col) {
+  if (sc === col) sd = sd === 'asc' ? 'desc' : 'asc';
+  else { sc = col; sd = 'asc'; }
+  document.querySelectorAll('.sort-ind').forEach(e => e.textContent = '');
+  const el = document.getElementById('si-' + col);
+  if (el) el.textContent = sd === 'asc' ? '↑' : '↓';
+  render();
+}
+
+function saveNote(id, v) {
+  notes[id] = v;
+  localStorage.setItem('dnc_standalone_notes', JSON.stringify(notes));
+}
+
+function renderSigs(sigs) {
+  if (!sigs || !sigs.length) return '<span class="sig-none">—</span>';
+  const sc = sigScore(sigs), lv = sigLevel(sc);
+  const lvCls = lv === 'high' ? 'sig-score-high' : lv === 'med' ? 'sig-score-med' : 'sig-score-low';
+  const lvLabel = lv === 'high' ? 'HIGH' : lv === 'med' ? 'MED' : 'LOW';
+  return `<div class="sig-cell">${sigs.map(s =>
+    `<div><span class="sig-chip ${s.cls}">${s.bot}</span><span class="sig-score ${lvCls}">${lvLabel}</span></div>
+     <div class="sig-text">${s.text}</div>`
+  ).join('')}</div>`;
+}
+
+function render() {
+  const q   = (document.getElementById('si')?.value || '').toLowerCase();
+  const af  = document.getElementById('assignee-sel')?.value || '';
+  let rows  = [...ALL];
+
+  if (af === '__unassigned__') rows = rows.filter(t => !t.assignee_name);
+  else if (af)                  rows = rows.filter(t => t.assignee_name === af);
+
+  if      (cf === 'critical')    rows = rows.filter(t => t.prl === 'critical');
+  else if (cf === 'high')        rows = rows.filter(t => t.prl === 'high');
+  else if (cf === 'medium')      rows = rows.filter(t => t.prl === 'medium');
+  else if (cf === 'low')         rows = rows.filter(t => t.prl === 'low');
+  else if (cf === 'needs-us')    rows = rows.filter(t => t.rs.sort === 0 && getState(t.ticket_id) === 'open');
+  else if (cf === 'expedite')    rows = rows.filter(t => t.expedite && getState(t.ticket_id) === 'open');
+  else if (cf === 'high-signal') rows = rows.filter(t => t.sigLevel === 'high' && getState(t.ticket_id) === 'open');
+  else if (cf === 'open')        rows = rows.filter(t => getState(t.ticket_id) === 'open');
+  else if (cf === 'hold')        rows = rows.filter(t => getState(t.ticket_id) === 'hold');
+  else if (cf === 'done')        rows = rows.filter(t => getState(t.ticket_id) === 'done');
+
+  if (q) rows = rows.filter(t =>
+    String(t.ticket_id).includes(q) ||
+    (t.requester_email||'').toLowerCase().includes(q) ||
+    (t.requester_name||'').toLowerCase().includes(q) ||
+    (t.subject||'').toLowerCase().includes(q) ||
+    (t.workspace_id||'').toLowerCase().includes(q) ||
+    (t.assignee_name||'').toLowerCase().includes(q)
+  );
+
+  rows.sort((a, b) => {
+    let av = a[sc], bv = b[sc];
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    if (av == null) av = sd === 'asc' ? Infinity : -Infinity;
+    if (bv == null) bv = sd === 'asc' ? Infinity : -Infinity;
+    if (av === bv && sc === 'rank') return b.wh - a.wh;
+    return sd === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+
+  const tbody = document.getElementById('tb');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="13" class="empty">No tickets match current filters</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(t => {
+    const st = getState(t.ticket_id);
+    const wCls  = t.wh >= 72 ? 'w-urgent' : t.wh >= 48 ? 'w-warn' : 'w-ok';
+    const qCls  = t.q === 'Compliance' ? 'q-comp' : t.q === 'Outreach' ? 'q-out' : 'q-deliv';
+
+    let wsCell;
+    if (t.workspace_id) {
+      const opsUrl = `https://app.beehiiv.com/system_admin/opscon/account_reviews/${encodeURIComponent(t.workspace_id)}`;
+      const pubUrl = t.publication_id ? `${PUB_BASE}${encodeURIComponent(t.publication_id)}&tab=993-publication` : null;
+      wsCell = `<div class="ws-pills"><a href="${opsUrl}" class="ws-pill ws-opscon" target="_blank">↗ OpsCon</a>${pubUrl ? `<a href="${pubUrl}" class="ws-pill ws-pub" target="_blank">📊 Pub Overview</a>` : ''}</div>`;
+    } else { wsCell = `<span class="ws-none">—</span>`; }
+
+    let mrrCell;
+    if (t.mrrInvoiced)            mrrCell = `<span class="mrr-invoiced">Invoiced</span>`;
+    else if (t.mrr !== null && t.mrr > 0)
+      mrrCell = `<span class="mrr-val">$${t.mrr.toLocaleString('en-US',{maximumFractionDigits:0})}<span style="font-weight:400;color:var(--text5)">/mo</span></span>${t.mrrTotal ? `<div class="mrr-sub">$${Math.round(t.mrrTotal).toLocaleString()} ltv</div>` : ''}`;
+    else                           mrrCell = `<span class="mrr-none">—</span>`;
+
+    const n = (notes[t.ticket_id] || '').replace(/"/g, '&quot;');
+    const newBadge  = t.isNew && st === 'open' ? `<span class="badge-new">New</span>` : '';
+    const staleBadge= t.isStale ? `<span class="badge-stale">Stale</span>` : '';
+    const expBadge  = t.expedite ? `<span class="badge-expedite">🚨 Expedite</span>` : '';
+    const reqUrl    = `https://app.beehiiv.com/system_admin/opscon/account_reviews?query=${encodeURIComponent(t.requester_email)}`;
+    const trCls     = st !== 'open' ? `class="${st==='done'?'st-done':'st-hold'} ${t.isNew?'is-new':''}"` : (t.isNew ? `class="is-new"` : '');
+
+    return `<tr id="row-${t.ticket_id}" ${trCls}>
+<td>${newBadge}<a href="https://beehiivhelp.zendesk.com/agent/tickets/${t.ticket_id}" class="ticket-num" target="_blank">#${t.ticket_id}</a>${staleBadge}<div class="asgn">${t.assignee_name||'Unassigned'}</div></td>
+<td><span class="pill ${qCls}">${t.q}</span></td>
+<td><span class="pill p-${t.prl}">${t.prl.charAt(0).toUpperCase()+t.prl.slice(1)}</span></td>
+<td><span class="pill ${t.it.cls}">${t.it.label}</span></td>
+<td><a href="${reqUrl}" class="req-name" target="_blank">${t.requester_name||t.requester_email}</a>${expBadge}<span class="sub-text" title="${t.subject}">${t.subject}</span></td>
+<td>${wsCell}</td>
+<td><span class="pill ${t.pl.cls}">${t.pl.label}</span></td>
+<td>${mrrCell}</td>
+<td><span class="${wCls}">${fmtW(t.wh)}</span></td>
+<td><span class="pill ${t.ss.cls}">${t.ss.label}</span></td>
+<td class="wrap">${renderSigs(t.sigs)}</td>
+<td><span class="pill ${t.rs.cls}">${t.rs.label}</span></td>
+<td class="wrap"><input class="ni" type="text" placeholder="Add a note…" value="${n}" onchange="saveNote(${t.ticket_id},this.value)"></td>
+</tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
